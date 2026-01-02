@@ -10,6 +10,7 @@ use backoff::backoff::Backoff as _;
 use futures::{SinkExt as _, StreamExt as _};
 use secrecy::ExposeSecret as _;
 use serde_json::{Value, json};
+use serde::Serialize;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc, watch};
 use tokio::time::{interval, sleep, timeout};
@@ -69,6 +70,12 @@ pub struct ConnectionManager {
     sender_tx: mpsc::UnboundedSender<String>,
     /// Broadcast sender for incoming messages
     broadcast_tx: broadcast::Sender<WsMessage>,
+}
+
+#[derive(Serialize)]
+struct OnOpen {
+  pub markets: Vec<String>,
+  pub r#type: String,
 }
 
 impl ConnectionManager {
@@ -337,6 +344,14 @@ impl ConnectionManager {
     /// Send a subscription request to the WebSocket server.
     pub fn send(&self, message: &SubscriptionRequest) -> Result<()> {
         let mut v = serde_json::to_value(message)?;
+          
+        let on_open = OnOpen {
+          markets: message.markets.clone(),
+          r#type: message.r#type.clone(),
+        };
+        let mut on_open_json = serde_json::to_value(&on_open)?;
+        println!("Sending on open request: {}", on_open_json);
+      
 
         // Only expose credentials when serializing on the wire, otherwise do not include
         // credentials in other serialization contexts
@@ -347,12 +362,12 @@ impl ConnectionManager {
                 "passphrase": creds.passphrase.expose_secret(),
             });
 
-            if let Value::Object(ref mut obj) = v {
+            if let Value::Object(ref mut obj) = on_open_json {
                 obj.insert("auth".to_owned(), auth);
             }
         }
 
-        let json = serde_json::to_string(&v)?;
+        let json = serde_json::to_string(&on_open_json)?;
         println!("Sending subscription request: {}", json);
         self.sender_tx
             .send(json)
