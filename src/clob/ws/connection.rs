@@ -345,17 +345,14 @@ impl ConnectionManager {
     pub fn send(&self, message: &SubscriptionRequest) -> Result<()> {
         let mut v = serde_json::to_value(message)?;
           
-        let on_open = OnOpen {
-          markets: message.markets.clone(),
-          r#type: message.r#type.clone(),
-        };
-        let mut on_open_json = serde_json::to_value(&on_open)?;
-        println!("Sending on open request: {}", on_open_json);
-      
-
-        // Only expose credentials when serializing on the wire, otherwise do not include
-        // credentials in other serialization contexts
-        if let Some(creds) = message.auth.as_ref() {
+        if message.r#type == "user".to_owned() {
+          let on_open = OnOpen {
+            markets: message.markets.clone(),
+            r#type: message.r#type.clone(),
+          };
+          let mut on_open_json = serde_json::to_value(&on_open)?;
+          println!("Sending on open request: {}", on_open_json);
+          if let Some(creds) = message.auth.as_ref() {
             let auth = json!({
                 "apiKey": creds.key.to_string(),
                 "secret": creds.secret.expose_secret(),
@@ -369,6 +366,27 @@ impl ConnectionManager {
 
         let json = serde_json::to_string(&on_open_json)?;
         println!("Sending subscription request: {}", json);
+        self.sender_tx
+            .send(json)
+            .map_err(|_e| WsError::ConnectionClosed)?;
+        return Ok(());
+        }
+
+        // Only expose credentials when serializing on the wire, otherwise do not include
+        // credentials in other serialization contexts
+        if let Some(creds) = message.auth.as_ref() {
+            let auth = json!({
+                "apiKey": creds.key.to_string(),
+                "secret": creds.secret.expose_secret(),
+                "passphrase": creds.passphrase.expose_secret(),
+            });
+
+            if let Value::Object(ref mut obj) = v {
+                obj.insert("auth".to_owned(), auth);
+            }
+        }
+
+        let json = serde_json::to_string(&v)?;
         self.sender_tx
             .send(json)
             .map_err(|_e| WsError::ConnectionClosed)?;
