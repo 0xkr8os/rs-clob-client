@@ -187,6 +187,8 @@ impl<S: State> Client<S> {
             .subscribe_market(asset_ids)?;
     
         Ok(stream.filter_map(|msg_result| async move {
+          println!("Received last trade price for market: {:?}", msg_result);
+
             match msg_result {
                 Ok(WsMessage::LastTradePrice(price)) => Some(Ok(price)),
                 Err(e) => Some(Err(e)),
