@@ -353,6 +353,7 @@ impl ConnectionManager {
         }
 
         let json = serde_json::to_string(&v)?;
+        println!("Sending subscription request: {}", json);
         self.sender_tx
             .send(json)
             .map_err(|_e| WsError::ConnectionClosed)?;
