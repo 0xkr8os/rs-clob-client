@@ -155,6 +155,8 @@ pub struct LastTradePrice {
     pub market: String,
     /// Last trade price
     pub price: Decimal,
+    /// Size of the last trade
+    pub size: Decimal,
     /// Side of the last trade
     #[serde(skip_serializing_if = "Option::is_none")]
     pub side: Option<Side>,
