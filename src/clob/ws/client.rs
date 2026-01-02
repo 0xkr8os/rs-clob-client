@@ -10,7 +10,7 @@ use super::connection::{ConnectionManager, ConnectionState};
 use super::interest::InterestTracker;
 use super::subscription::{ChannelType, SubscriptionManager};
 use super::types::response::{
-    BookUpdate, MidpointUpdate, OrderMessage, PriceChange, TradeMessage, WsMessage,
+    BookUpdate, LastTradePrice, MidpointUpdate, OrderMessage, PriceChange, TradeMessage, WsMessage,
 };
 use crate::Result;
 use crate::auth::state::{Authenticated, State, Unauthenticated};
@@ -170,6 +170,25 @@ impl<S: State> Client<S> {
         Ok(stream.filter_map(|msg_result| async move {
             match msg_result {
                 Ok(WsMessage::PriceChange(price)) => Some(Ok(price)),
+                Err(e) => Some(Err(e)),
+                _ => None,
+            }
+        }))
+    }
+
+    /// Subscribe to last trade price updates for specific assets.
+    pub fn subscribe_last_trade_price(
+        &self,
+        asset_ids: Vec<String>,
+    ) -> Result<impl Stream<Item = Result<LastTradePrice>>> {
+        let stream = self
+            .market_handles()?
+            .subscriptions
+            .subscribe_market(asset_ids)?;
+    
+        Ok(stream.filter_map(|msg_result| async move {
+            match msg_result {
+                Ok(WsMessage::LastTradePrice(price)) => Some(Ok(price)),
                 Err(e) => Some(Err(e)),
                 _ => None,
             }
